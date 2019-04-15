@@ -14,8 +14,8 @@ class SentimentServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->publishes([
-            __DIR__ . '/config/laravel-sentiment.php' => config_path('laravel-sentiment.php'),
-            'config']);
+            __DIR__ . '/config/laravel-sentiment.php' => config_path('laravel-sentiment.php')],
+            'config');
     }
 
     /**
