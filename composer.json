@@ -26,5 +26,20 @@
   },
   "require-dev": {
     "phpunit/phpunit": "~4.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Zidan\\LaravelSentiment\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Zidan\\LaravelSentiment\\SentimentServiceProvider"
+      ],
+      "aliases": {
+        "SentimentAnalysis": "Zidan\\LaravelSentiment\\Facades\\Analise"
+      }
+    }
   }
 }
