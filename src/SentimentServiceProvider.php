@@ -15,7 +15,7 @@ class SentimentServiceProvider extends ServiceProvider
     {
         $this->publishes([
             __DIR__ . '/config/laravel-sentiment.php' => config_path('laravel-sentiment.php'),
-        ]);
+            'config']);
     }
 
     /**
