@@ -3,7 +3,7 @@
 namespace Zidan\LaravelSentiment;
 
 
-class Analyze extends Sentiment
+class Analise extends Sentiment
 {
 
     private $text = '';

@@ -13,7 +13,9 @@ class SentimentServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        //
+        $this->publishes([
+            __DIR__ . '/config/laravel-sentiment.php' => config_path('laravel-sentiment.php'),
+        ]);
     }
 
     /**
@@ -28,10 +30,10 @@ class SentimentServiceProvider extends ServiceProvider
                 return new Analise();
             });
 
-            $this->mergeConfigFrom(
-                __DIR__.'/config/laravel-sentiment.php',
-                'laravel-sentiment'
-            );
+        $this->mergeConfigFrom(
+            __DIR__ . '/config/laravel-sentiment.php',
+            'laravel-sentiment'
+        );
 
     }
 }
