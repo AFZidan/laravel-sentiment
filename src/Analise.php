@@ -24,6 +24,8 @@ class Analise extends Sentiment
     public function setText($text)
     {
         $this->text = $text;
+        $this->scores = [];
+        $this->scoresKeywords = ['pos' => [], 'neg' => [], 'neu' => [], 'que' => []];
         return $this;
     }
 
@@ -36,7 +38,7 @@ class Analise extends Sentiment
     public function decision($text = null)
     {
         if ($text)
-            $this->text = $text;
+            $this->setText($text);
         // Do not call functions so that we'll compute only one time
         return $this->categorise($this->text);
 
@@ -78,7 +80,7 @@ class Analise extends Sentiment
     {
 
         if ($text)
-            $this->text = $text;
+            $this->setText($text);
         $scores = $this->classify($this->text);
         return max($scores);
     }
