@@ -41,7 +41,7 @@ class Sentiment
      * Max length of a taken for it be taken into consideration
      * @var int
      */
-    protected $maxTokenLength = 15;
+    protected $maxTokenLength = 40;
 
     /**
      * Classification of opinions
@@ -94,9 +94,11 @@ class Sentiment
     ];
 
 
-    protected $scoresKeywords = ['positive' => [], 'negative' => [], 'neutral' => [], 'question' => []];
+    protected $scoresKeywords = ['pos' => [], 'neg' => [], 'neu' => [], 'que' => []];
 
     private $words = [];
+    
+    protected $scores = [];
 
     /**
      * Sentiment constructor.
@@ -108,24 +110,24 @@ class Sentiment
         $this->maxTokenLength = config("laravel-sentiment.max_token_length");
 
         $this->types = [
-            config("laravel-sentiment.types.positive", 'positive'),
-            config("laravel-sentiment.types.negative", 'negative'),
-            config("laravel-sentiment.types.neutral", 'neutral'),
-            config("laravel-sentiment.types.question", 'question')
+            config("laravel-sentiment.types.positive", 'pos'),
+            config("laravel-sentiment.types.negative", 'neg'),
+            config("laravel-sentiment.types.neutral", 'neu'),
+            config("laravel-sentiment.types.question", 'que')
         ];
         $this->typeDocCounts =
         $this->typeTokCounts = [
-            config("laravel-sentiment.types.positive", 'positive') => 0,
-            config("laravel-sentiment.types.negative", 'negative') => 0,
-            config("laravel-sentiment.types.neutral", 'neutral')   => 0,
-            config("laravel-sentiment.types.question", 'question') => 0
+            config("laravel-sentiment.types.positive", 'pos') => 0,
+            config("laravel-sentiment.types.negative", 'neg') => 0,
+            config("laravel-sentiment.types.neutral", 'neu')   => 0,
+            config("laravel-sentiment.types.question", 'que') => 0
         ];
 
         $this->prior = [
-            config("laravel-sentiment.types.positive", 'positive') => 0.25,
-            config("laravel-sentiment.types.negative", 'negative') => 0.25,
-            config("laravel-sentiment.types.neutral", 'neutral')   => 0.25,
-            config("laravel-sentiment.types.question", 'question') => 0.26
+            config("laravel-sentiment.types.positive", 'pos') => 0.25,
+            config("laravel-sentiment.types.negative", 'neg') => 0.25,
+            config("laravel-sentiment.types.neutral", 'neu')   => 0.25,
+            config("laravel-sentiment.types.question", 'que') => 0.26
         ];
 
         //set the base folder for the data models
@@ -142,7 +144,9 @@ class Sentiment
      */
     public function classify($text)
     {
-
+        if ($this->scores) {
+            return $this->scores;
+        }
         //For each negative prefix in the list
         if ($this->negPrefixList) {
 
@@ -189,7 +193,7 @@ class Sentiment
                         $total_score++;
 
                     } //If dictionary[token][type] is set
-                    elseif (isset($this->dictionary[$type][$token])) {
+                    elseif (isset($this->dictionary[$type]) && in_array($token, $this->dictionary[$type])) {
                         // save decision keywords
                         $this->scoresKeywords[$type][] = $token;
                         // count up scores
@@ -213,6 +217,7 @@ class Sentiment
 
         //Sort array in reverse order
         arsort($scores);
+        $this->scores = $scores;
         return $scores;
     }
 
@@ -472,9 +477,8 @@ class Sentiment
 
     public function getScoresKeywords($type = null)
     {
-        if ($type) {
-            $typeName = array_search($type, config("laravel-sentiment.types"));
-            return $this->scoresKeywords[$typeName];
+        if ($type && isset($this->scoresKeywords[$type])) {
+            return $this->scoresKeywords[$type];
         }
 
         return $this->scoresKeywords;
