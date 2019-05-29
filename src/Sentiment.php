@@ -143,18 +143,18 @@ class Sentiment
         if ($this->scores) {
             return $this->scores;
         }
+
         //For each negative prefix in the list
-        if ($this->negPrefixList) {
+        /*if ($this->negPrefixList) {
 
             foreach ($this->negPrefixList as $char) {
-
                 //Search if that prefix is in the document
                 if (strpos($text, $char) !== false) {
                     //remove the white space after the negative prefix
                     $text = str_replace($char . ' ', $char, $text);
                 }
             }
-        }
+        }*/
 
 
 //        $tokens = $this->_getTokens($text);
@@ -179,25 +179,23 @@ class Sentiment
                     // word is exists in the classified text
                     if (( $position = stripos($text, $word) ) !== false) {
                         // check if the previos token is negative prefix
+                        $negPrefix = $this->getTokenByPosition($text, $position - 2);
                         if (
-                            $position
-                            && ( $negPrefix = $this->getTokenByPosition($text, $position - 1) )
-                            && in_array($negPrefix, $this->negPrefixList)
+                            $position && $negPrefix && in_array($negPrefix, $this->negPrefixList)
                         ) {
                             $this->scoresKeywords['negative'][] = $negPrefix . " " . $word;
-
-//                             count up scores
+                            // count up scores
                             $scores['negative']++;
-                            $total_score++;
-                            continue;
+                        } else {
+                            $scores[$type]++;
+                            $this->scoresKeywords[$type][] = $word;
                         }
-
-                        $scores[$type]++;
-                        $this->scoresKeywords[$type][] = $word;
+                        $total_score++;
                     }
-                }
-            }
 
+                }
+
+            }
             $scores[$type] = $this->prior[$type] * $scores[$type];
         }
 
@@ -216,39 +214,10 @@ class Sentiment
 
     private function getTokenByPosition($text, $position)
     {
-        $start = $this->prevSpace($text, $position);
-        $end = $this->nextSpace($text, $position);
+        $start = strpos($text, ' ', -$position);
+        $end = strpos($text, ' ', $position);
         return substr($text, $start, $end);
     }
-
-    /**
-     * @param $text
-     * @param $position
-     * @return int space Position
-     */
-    private function nextSpace($text, $position)
-    {
-        $next = $position + 1;
-        if (substr($text, $position, $next) !== " ") {
-            $this->nextSpace($text, $next);
-        }
-        return $next;
-    }
-
-    /**
-     * @param $text
-     * @param $position
-     * @return int space Position
-     */
-    private function prevSpace($text, $position)
-    {
-        $prev = $position - 1;
-        if (substr($text, $position, $prev) !== " ") {
-            $this->prevSpace($text, $prev);
-        }
-        return $prev;
-    }
-
 
     /**
      * Get the type of the text based on it's score
