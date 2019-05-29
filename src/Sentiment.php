@@ -81,8 +81,8 @@ class Sentiment
      * Number of analyzed texts
      * @var int
      */
-    protected $docCount = 0;
-    private $useDefaultDataFolder = true;
+    protected $docCount             = 0;
+    private   $useDefaultDataFolder = true;
     /**
      * @var array
      */
@@ -94,10 +94,10 @@ class Sentiment
     ];
 
 
-    protected $scoresKeywords = ['pos' => [], 'neg' => [], 'neu' => [], 'que' => []];
+    protected $scoresKeywords = ['positive' => [], 'negative' => [], 'neutral' => [], 'question' => []];
 
     private $words = [];
-    
+
     protected $scores = [];
 
     /**
@@ -109,25 +109,21 @@ class Sentiment
         $this->minTokenLength = config("laravel-sentiment.min_token_length");
         $this->maxTokenLength = config("laravel-sentiment.max_token_length");
 
-        $this->types = [
-            config("laravel-sentiment.types.positive", 'pos'),
-            config("laravel-sentiment.types.negative", 'neg'),
-            config("laravel-sentiment.types.neutral", 'neu'),
-            config("laravel-sentiment.types.question", 'que')
-        ];
+        $this->types = ['positive', 'negative', 'neutral', 'question'];
         $this->typeDocCounts =
+        $this->scores =
         $this->typeTokCounts = [
-            config("laravel-sentiment.types.positive", 'pos') => 0,
-            config("laravel-sentiment.types.negative", 'neg') => 0,
-            config("laravel-sentiment.types.neutral", 'neu')   => 0,
-            config("laravel-sentiment.types.question", 'que') => 0
+            'positive' => 0,
+            'negative' => 0,
+            'neutral'  => 0,
+            'question' => 0
         ];
 
         $this->prior = [
-            config("laravel-sentiment.types.positive", 'pos') => 0.25,
-            config("laravel-sentiment.types.negative", 'neg') => 0.25,
-            config("laravel-sentiment.types.neutral", 'neu')   => 0.25,
-            config("laravel-sentiment.types.question", 'que') => 0.26
+            'positive' => 0.25,
+            'negative' => 0.25,
+            'neutral'  => 0.25,
+            'question' => 0.26
         ];
 
         //set the base folder for the data models
@@ -161,7 +157,7 @@ class Sentiment
         }
 
 
-        $tokens = $this->_getTokens($text);
+//        $tokens = $this->_getTokens($text);
 
         // calculate the score in each category
 
@@ -172,42 +168,39 @@ class Sentiment
 
         //Loop through all of the different types set in the $types variable
         foreach ($this->types as $type) {
-
             //In the scores array add another dimention for the type and set it's value to 1. EG $scores->neg->1
             $scores[$type] = 1;
 
             //For each of the individual words used loop through to see if they match anything in the $dictionary
-            foreach ($tokens as $i => $token) {
-                //If statement so to ignore tokens which are either too long or too short or in the $ignoreList
-                if (strlen($token) > $this->minTokenLength && strlen($token) < $this->maxTokenLength && !in_array($token, $this->ignoreList)) {
 
-                    // check if previous token is negative prefix then current token will not be positive
+            //If statement so to ignore tokens which are either too long or too short or in the $ignoreList
+            if (isset($this->dictionary[$type])) {
+                foreach ($this->dictionary[$type] as $word) {
+                    // word is exists in the classified text
+                    if (( $position = stripos($text, $word) ) !== false) {
+                        // check if the previos token is negative prefix
+                        if (
+                            $position
+                            && ( $negPrefix = $this->getTokenByPosition($text, $position - 1) )
+                            && in_array($negPrefix, $this->negPrefixList)
+                        ) {
+                            $this->scoresKeywords['negative'][] = $negPrefix . " " . $word;
 
-                    if (isset($tokens[$i - 1]) && in_array($tokens[$i - 1], $this->negPrefixList)) {
+//                             count up scores
+                            $scores['negative']++;
+                            $total_score++;
+                            continue;
+                        }
 
-                        $neg = config("laravel-sentiment.types.negative");
-                        $this->scoresKeywords[$neg][] = "{$tokens[$i - 1]} {$token}";
-
-                        // count up scores
-                        $scores[$neg]++;
-                        $total_score++;
-
-                    } //If dictionary[token][type] is set
-                    elseif (isset($this->dictionary[$type]) && in_array($token, $this->dictionary[$type])) {
-                        // save decision keywords
-                        $this->scoresKeywords[$type][] = $token;
-                        // count up scores
                         $scores[$type]++;
-                        $total_score++;
+                        $this->scoresKeywords[$type][] = $word;
                     }
-
                 }
             }
 
-            //Score for this type is the prior probability multiplyied by the score for this type
-//            $scores[$type] = $this->prior[$type] * $scores[$type];
-
+            $scores[$type] = $this->prior[$type] * $scores[$type];
         }
+
 
         if ($total_score > 0) {
             foreach ($this->types as $type) {
@@ -221,6 +214,42 @@ class Sentiment
         return $scores;
     }
 
+    private function getTokenByPosition($text, $position)
+    {
+        $start = $this->prevSpace($text, $position);
+        $end = $this->nextSpace($text, $position);
+        return substr($text, $start, $end);
+    }
+
+    /**
+     * @param $text
+     * @param $position
+     * @return int space Position
+     */
+    private function nextSpace($text, $position)
+    {
+        $next = $position + 1;
+        if (substr($text, $position, $next) !== " ") {
+            $this->nextSpace($text, $next);
+        }
+        return $next;
+    }
+
+    /**
+     * @param $text
+     * @param $position
+     * @return int space Position
+     */
+    private function prevSpace($text, $position)
+    {
+        $prev = $position - 1;
+        if (substr($text, $position, $prev) !== " ") {
+            $this->prevSpace($text, $prev);
+        }
+        return $prev;
+    }
+
+
     /**
      * Get the type of the text based on it's score
      *
@@ -229,7 +258,6 @@ class Sentiment
      */
     public function categorise($text)
     {
-
         $scores = $this->classify($text);
         //Classification is the key to the scores array
         $classification = key($scores);
@@ -246,10 +274,10 @@ class Sentiment
     {
         $typeName = array_search($type, config("laravel-sentiment.types"));
 
-        $file = config("laravel-sentiment.data_files.{$typeName}");
+        $file = config("laravel-sentiment.data_files.{$type}");
 
         if (!Storage::exists($file)) {
-            return abort(500, 'Data File does not exist: ' . $file);
+            return abort(500, 'Data File does not exist: ' . $file . " - $type ");
         }
 
         $content = Storage::get($file);
@@ -464,7 +492,7 @@ class Sentiment
         foreach ($this->types as $type) {
             $dict = "{$dictionaries}source.{$type}.php";
 
-            require_once($dict);
+            require_once( $dict );
 
             $data = $type;
 
