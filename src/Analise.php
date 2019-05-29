@@ -25,7 +25,7 @@ class Analise extends Sentiment
     {
         $this->text = $text;
         $this->scores = [];
-        $this->scoresKeywords = ['pos' => [], 'neg' => [], 'neu' => [], 'que' => []];
+        $this->scoresKeywords = ['positive' => [], 'negative' => [], 'neutral' => [], 'question' => []];
         return $this;
     }
 
@@ -95,7 +95,7 @@ class Analise extends Sentiment
     public function isPositive($string)
     {
         return $this->setText($string ?? $this->text)
-                ->decision() == config("laravel-sentiment.types.positive");
+                ->decision() == 'positive';
     }
 
     /**
@@ -108,7 +108,7 @@ class Analise extends Sentiment
     public function isNegative($string)
     {
         return $this->setText($string ?? $this->text)
-                ->decision() == config("laravel-sentiment.types.negative");
+                ->decision() == 'negative';
     }
 
     /**
@@ -121,7 +121,7 @@ class Analise extends Sentiment
     public function isNeutral($string)
     {
         return $this->setText($string ?? $this->text)
-                ->decision() == config("laravel-sentiment.types.neutral");
+                ->decision() == 'neutral';
 
     }
 
@@ -136,6 +136,6 @@ class Analise extends Sentiment
     {
 
         return $this->setText($string ?? $this->text)
-                ->decision() == config("laravel-sentiment.types.question");
+                ->decision() == 'question';
     }
 }
