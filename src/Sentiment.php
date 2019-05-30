@@ -145,7 +145,7 @@ class Sentiment
         }
 
         //For each negative prefix in the list
-        /*if ($this->negPrefixList) {
+        if ($this->negPrefixList) {
 
             foreach ($this->negPrefixList as $char) {
                 //Search if that prefix is in the document
@@ -154,10 +154,10 @@ class Sentiment
                     $text = str_replace($char . ' ', $char, $text);
                 }
             }
-        }*/
+        }
 
 
-//        $tokens = $this->_getTokens($text);
+        $tokens = $this->_getTokens($text);
 
         // calculate the score in each category
 
@@ -172,33 +172,37 @@ class Sentiment
             $scores[$type] = 1;
 
             //For each of the individual words used loop through to see if they match anything in the $dictionary
+            foreach ($tokens as $i => $token) {
+                //If statement so to ignore tokens which are either too long or too short or in the $ignoreList
+                if (strlen($token) > $this->minTokenLength && strlen($token) < $this->maxTokenLength && !in_array($token, $this->ignoreList)) {
 
-            //If statement so to ignore tokens which are either too long or too short or in the $ignoreList
-            if (isset($this->dictionary[$type])) {
-                foreach ($this->dictionary[$type] as $word) {
-                    // word is exists in the classified text
-                    if (( $position = stripos($text, $word) ) !== false) {
-                        // check if the previos token is negative prefix
-                        $negPrefix = $this->getTokenByPosition($text, $position - 2);
-                        if (
-                            $position && $negPrefix && in_array($negPrefix, $this->negPrefixList)
-                        ) {
-                            $this->scoresKeywords['negative'][] = $negPrefix . " " . $word;
-                            // count up scores
-                            $scores['negative']++;
-                        } else {
-                            $scores[$type]++;
-                            $this->scoresKeywords[$type][] = $word;
-                        }
+                    // check if previous token is negative prefix then current token will not be positive
+
+                    if (isset($tokens[$i - 1]) && in_array($tokens[$i - 1], $this->negPrefixList)) {
+
+                        $neg = config("laravel-sentiment.types.negative");
+                        $this->scoresKeywords[$neg][] = "{$tokens[$i - 1]} {$token}";
+
+                        // count up scores
+                        $scores[$neg]++;
+                        $total_score++;
+
+                    } //If dictionary[token][type] is set
+                    elseif (isset($this->dictionary[$type]) && in_array($token, $this->dictionary[$type])) {
+                        // save decision keywords
+                        $this->scoresKeywords[$type][] = $token;
+                        // count up scores
+                        $scores[$type]++;
                         $total_score++;
                     }
 
                 }
-
             }
-            $scores[$type] = $this->prior[$type] * $scores[$type];
-        }
 
+            //Score for this type is the prior probability multiplyied by the score for this type
+//            $scores[$type] = $this->prior[$type] * $scores[$type];
+
+        }
 
         if ($total_score > 0) {
             foreach ($this->types as $type) {
