@@ -169,7 +169,7 @@ class Sentiment
         //Loop through all of the different types set in the $types variable
         foreach ($this->types as $type) {
             //In the scores array add another dimention for the type and set it's value to 1. EG $scores->neg->1
-            $scores[$type] = 1;
+            $scores[$type] = 0;
 
             //For each of the individual words used loop through to see if they match anything in the $dictionary
             foreach ($tokens as $i => $token) {
