@@ -213,7 +213,8 @@ class Sentiment
         //Sort array in reverse order
         arsort($scores);
         $this->scores = $scores;
-        return $scores;
+
+        return $this->scores;
     }
 
     private function getTokenByPosition($text, $position)
@@ -486,4 +487,3 @@ class Sentiment
     }
 
 }
-
