@@ -164,6 +164,7 @@ class Sentiment
             $scores[$type] = isset($scores[$type])?$scores[$type]:0;
 
             //For each of the individual words used loop through to see if they match anything in the $dictionary
+
             foreach ($this->tokens as $i => $token) {
 
                 //If statement so to ignore tokens which are either too long or too short or in the $ignoreList
@@ -174,10 +175,8 @@ class Sentiment
                     if (array_search($token, $negativeTokens) !==false) {
                         $neg = config("laravel-sentiment.types.negative");
                         $this->scoresKeywords[$neg][] = $token;
-
                         // count up scores
-
-                        $scores[$neg] = in_array($neg, $scores) ? $scores[$neg]++ : $scores[$neg] = 1;
+                        $scores[$neg] = isset($scores[$neg]) ? $scores[$neg]++ : 1;
                         $total_score++;
 
                     } elseif (isset($this->dictionary[$type]) && in_array($token, $this->dictionary[$type])) {
