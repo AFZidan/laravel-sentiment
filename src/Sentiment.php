@@ -72,6 +72,11 @@ class Sentiment
     ];
 
     /**
+     * List of tokens in a text
+     * @var array
+     */
+    protected $tokens = [];
+    /**
      * Number of tokens in a text
      * @var int
      */
@@ -143,21 +148,8 @@ class Sentiment
         if ($this->scores) {
             return $this->scores;
         }
-
-        //For each negative prefix in the list
-        if ($this->negPrefixList) {
-
-            foreach ($this->negPrefixList as $char) {
-                //Search if that prefix is in the document
-                if (strpos($text, $char) !== false) {
-                    //remove the white space after the negative prefix
-                    $text = str_replace($char . ' ', $char, $text);
-                }
-            }
-        }
-
-
-        $tokens = $this->_getTokens($text);
+        $this->tokens = $this->_getTokens($text);
+        $negativeTokens = $this->clearNegativePrefix($text);
 
         // calculate the score in each category
 
@@ -169,26 +161,26 @@ class Sentiment
         //Loop through all of the different types set in the $types variable
         foreach ($this->types as $type) {
             //In the scores array add another dimention for the type and set it's value to 1. EG $scores->neg->1
-            $scores[$type] = 0;
+            $scores[$type] = isset($scores[$type])?$scores[$type]:0;
 
             //For each of the individual words used loop through to see if they match anything in the $dictionary
-            foreach ($tokens as $i => $token) {
+            foreach ($this->tokens as $i => $token) {
+
                 //If statement so to ignore tokens which are either too long or too short or in the $ignoreList
-                if (strlen($token) > $this->minTokenLength && strlen($token) < $this->maxTokenLength && !in_array($token, $this->ignoreList)) {
+                if (strlen($token) >= $this->minTokenLength && strlen($token) <= $this->maxTokenLength && !in_array($this->tokens, $this->ignoreList)) {
 
                     // check if previous token is negative prefix then current token will not be positive
 
-                    if (isset($tokens[$i - 1]) && in_array($tokens[$i - 1], $this->negPrefixList)) {
-
+                    if (array_search($token, $negativeTokens) !==false) {
                         $neg = config("laravel-sentiment.types.negative");
-                        $this->scoresKeywords[$neg][] = "{$tokens[$i - 1]} {$token}";
+                        $this->scoresKeywords[$neg][] = $token;
 
                         // count up scores
-                        $scores[$neg]++;
+
+                        $scores[$neg] = in_array($neg, $scores) ? $scores[$neg]++ : $scores[$neg] = 1;
                         $total_score++;
 
-                    } //If dictionary[token][type] is set
-                    elseif (isset($this->dictionary[$type]) && in_array($token, $this->dictionary[$type])) {
+                    } elseif (isset($this->dictionary[$type]) && in_array($token, $this->dictionary[$type])) {
                         // save decision keywords
                         $this->scoresKeywords[$type][] = $token;
                         // count up scores
@@ -199,12 +191,10 @@ class Sentiment
                 }
             }
 
-            //Score for this type is the prior probability multiplyied by the score for this type
-//            $scores[$type] = $this->prior[$type] * $scores[$type];
-
         }
 
         if ($total_score > 0) {
+
             foreach ($this->types as $type) {
                 $scores[$type] = round($scores[$type] / $total_score, 3);
             }
@@ -215,6 +205,30 @@ class Sentiment
         $this->scores = $scores;
 
         return $this->scores;
+    }
+
+    public function clearNegativePrefix($text)
+    {
+        $negativeTokens = [];
+        //For each negative prefix in the list
+        if ($this->negPrefixList) {
+
+            foreach ($this->negPrefixList as $char) {
+                //Search if that prefix is in the document
+                if (strpos($text, $char) !== false && in_array($char, $this->tokens)) {
+                    //remove the white space after the negative prefix
+                    $charIndex = array_search($char, $this->tokens);
+
+                    $next = $this->tokens[$charIndex + 1] ?? "";
+                    $negToken = "$char $next";
+                    array_splice($this->tokens, $charIndex + 1, 1);
+                    $this->tokens = array_replace($this->tokens, [$charIndex => $negToken]);
+                    $negativeTokens[] = $negToken;
+                }
+            }
+        }
+
+        return $negativeTokens;
     }
 
     private function getTokenByPosition($text, $position)
@@ -381,7 +395,7 @@ class Sentiment
 
         $typeName = array_search($type, config("laravel-sentiment.types"));
 
-        $file = config("laravel-sentiment.data_files.{$typeName}");
+        $file = config("laravel-sentiment.data_files.{$type}");
         if (Storage::exists($file)) {
             $temp = Storage::get($file);
             $words = unserialize($temp);
