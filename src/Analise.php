@@ -67,18 +67,7 @@ class Analise extends Sentiment
             $array[$value] = round($scores[$value], 2);
         }
 
-        return $this->clearifyScores($array);
-    }
-
-    protected function clearifyScores($scores)
-    {
-        if (array_sum(array_values($scores)) > 0) {
-            // the text is negative if positive and negative scores are equalitive
-            if (( $scores['positive'] == $scores['negative'] ) && $scores['negative'] >= $scores['question']) {
-                $scores['negative'] = $scores['positive'] + 0.1;
-            }
-        };
-        return $scores;
+        return $array;
     }
 
     /**
