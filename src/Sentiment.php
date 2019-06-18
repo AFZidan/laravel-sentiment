@@ -23,7 +23,9 @@ class Sentiment
      * List of words with negative prefixes, e.g. isn't, arent't
      * @var array
      */
-    protected $negPrefixList = [];
+    protected $negPrefixList        = [];
+    protected $negativePrefixTokens = [];
+    protected $positivePrefixTokens = [];
 
     /**
      * Storage of cached dictionaries
@@ -75,7 +77,7 @@ class Sentiment
      * List of tokens in a text
      * @var array
      */
-    protected $tokens = [];
+    protected $textTokens = [];
     /**
      * Number of tokens in a text
      * @var int
@@ -148,8 +150,10 @@ class Sentiment
         if ($this->scores) {
             return $this->scores;
         }
-        $this->tokens = $this->_getTokens($text);
-        $negativeTokens = $this->clearNegativePrefix($text);
+
+        $this->textTokens = $this->_getTokens($text);
+
+        $this->textTokens = $this->clearPrefix($text);
 
         // calculate the score in each category
 
@@ -161,32 +165,22 @@ class Sentiment
         //Loop through all of the different types set in the $types variable
         foreach ($this->types as $type) {
             //In the scores array add another dimention for the type and set it's value to 1. EG $scores->neg->1
-            $scores[$type] = isset($scores[$type])?$scores[$type]:0;
+            $scores[$type] = isset($scores[$type]) ? $scores[$type] : 0;
 
             //For each of the individual words used loop through to see if they match anything in the $dictionary
 
-            foreach ($this->tokens as $i => $token) {
+            foreach ($this->textTokens as $i => $token) {
 
                 //If statement so to ignore tokens which are either too long or too short or in the $ignoreList
-                if (strlen($token) >= $this->minTokenLength && strlen($token) <= $this->maxTokenLength && !in_array($this->tokens, $this->ignoreList)) {
+                if (strlen($token) >= $this->minTokenLength && strlen($token) <= $this->maxTokenLength && !in_array($this->textTokens, $this->ignoreList)) {
 
-                    // check if previous token is negative prefix then current token will not be positive
-
-                    if (array_search($token, $negativeTokens) !==false) {
-                        $neg = config("laravel-sentiment.types.negative");
-                        $this->scoresKeywords[$neg][] = $token;
-                        // count up scores
-                        $scores[$neg] = isset($scores[$neg]) ? $scores[$neg]++ : 1;
-                        $total_score++;
-
-                    } elseif (isset($this->dictionary[$type]) && in_array($token, $this->dictionary[$type])) {
+                    if (isset($this->dictionary[$type]) && in_array($token, $this->dictionary[$type])) {
                         // save decision keywords
                         $this->scoresKeywords[$type][] = $token;
                         // count up scores
                         $scores[$type]++;
                         $total_score++;
                     }
-
                 }
             }
 
@@ -201,12 +195,18 @@ class Sentiment
 
         //Sort array in reverse order
         arsort($scores);
+
         $this->scores = $scores;
+        if ($this->scores['positive'] > 0 && $this->scores['positive'] == $this->scores['negative']) {
+
+            $this->scores['negative'] += 0.01;
+            $this->scores['positive'] -= 0.01;
+        }
 
         return $this->scores;
     }
 
-    public function clearNegativePrefix($text)
+    public function clearPrefix($text)
     {
         $negativeTokens = [];
         //For each negative prefix in the list
@@ -214,20 +214,33 @@ class Sentiment
 
             foreach ($this->negPrefixList as $char) {
                 //Search if that prefix is in the document
-                if (strpos($text, $char) !== false && in_array($char, $this->tokens)) {
+                if (strpos($text, $char) !== false && in_array($char, $this->textTokens)) {
                     //remove the white space after the negative prefix
-                    $charIndex = array_search($char, $this->tokens);
+                    $charIndex = array_search($char, $this->textTokens);
 
-                    $next = $this->tokens[$charIndex + 1] ?? "";
-                    $negToken = "$char $next";
-                    array_splice($this->tokens, $charIndex + 1, 1);
-                    $this->tokens = array_replace($this->tokens, [$charIndex => $negToken]);
-                    $negativeTokens[] = $negToken;
+                    $next = $this->textTokens[$charIndex + 1] ?? "";
+                    $token = "$char $next";
+
+                    //next is positive token then add prefix and token to negative dictionary
+                    if (in_array($next, $this->dictionary['positive'])) {
+                        $this->dictionary['negative'][] = $token;
+                        $this->negativePrefixTokens[] = $token;
+
+                    }
+
+                    //next is positive token then add prefix and token to positive dictionary
+                    if (in_array($next, $this->dictionary['negative'])) {
+                        $this->dictionary['positive'][] = $token;
+                        $this->positivePrefixTokens[] = $token;
+                    }
+
+                    array_splice($this->textTokens, $charIndex + 1, 1);
+                    $this->textTokens = array_replace($this->textTokens, [$charIndex => $token]);
                 }
             }
         }
 
-        return $negativeTokens;
+        return $this->textTokens;
     }
 
     private function getTokenByPosition($text, $position)
@@ -246,9 +259,8 @@ class Sentiment
     public function categorise($text)
     {
         $scores = $this->classify($text);
-        //Classification is the key to the scores array
-        $classification = key($scores);
-        return $classification;
+
+        return array_search(max($scores), $scores);
     }
 
     /**
@@ -372,13 +384,14 @@ class Sentiment
 
         //Break string into individual words using explode putting them into an array
         $stringArray = explode(' ', $string);
+
         $stringArray = array_where($stringArray, function ($str) {
             if ($str)
                 return $str;
         });
 
-        //Return array with each individual token
-        return $stringArray;
+        //Return reindexed array with each individual token
+        return array_values($stringArray);
     }
 
     /**
@@ -420,44 +433,14 @@ class Sentiment
 
     /**
      * Function to clean a string so all characters with accents are turned into ASCII characters. EG: ‡ = a
-     *
+     * accepts only arabic and english chars
      * @param str $string
      * @return str
      */
     private function _cleanString($string)
     {
-
-        //        $diac =
-        //            /* A */
-        //            chr(192) . chr(193) . chr(194) . chr(195) . chr(196) . chr(197) .
-        //            /* a */
-        //            chr(224) . chr(225) . chr(226) . chr(227) . chr(228) . chr(229) .
-        //            /* O */
-        //            chr(210) . chr(211) . chr(212) . chr(213) . chr(214) . chr(216) .
-        //            /* o */
-        //            chr(242) . chr(243) . chr(244) . chr(245) . chr(246) . chr(248) .
-        //            /* E */
-        //            chr(200) . chr(201) . chr(202) . chr(203) .
-        //            /* e */
-        //            chr(232) . chr(233) . chr(234) . chr(235) .
-        //            /* Cc */
-        //            chr(199) . chr(231) .
-        //            /* I */
-        //            chr(204) . chr(205) . chr(206) . chr(207) .
-        //            /* i */
-        //            chr(236) . chr(237) . chr(238) . chr(239) .
-        //            /* U */
-        //            chr(217) . chr(218) . chr(219) . chr(220) .
-        //            /* u */
-        //            chr(249) . chr(250) . chr(251) . chr(252) .
-        //            /* yNn */
-        //            chr(255) . chr(209) . chr(241);
-        //
-        //        return strtolower(strtr($string, $diac, 'AAAAAAaaaaaaOOOOOOooooooEEEEeeeeCcIIIIiiiiUUUUuuuuyNn'));
-
-        $string = preg_replace('/[0-9]+/', '', $string);
+        $string = preg_replace('/[^أ-يA-Za-z ]/ui', '', $string);
         return $string;
-
     }
 
     /**
