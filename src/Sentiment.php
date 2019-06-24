@@ -168,7 +168,7 @@ class Sentiment
             $scores[$type] = isset($scores[$type]) ? $scores[$type] : 0;
 
             //For each of the individual words used loop through to see if they match anything in the $dictionary
-
+//dd($this->textTokens);
             foreach ($this->textTokens as $i => $token) {
 
                 //If statement so to ignore tokens which are either too long or too short or in the $ignoreList
@@ -209,35 +209,46 @@ class Sentiment
     public function clearPrefix($text)
     {
         $negativeTokens = [];
+        $removableIndexes = [];
         //For each negative prefix in the list
         if ($this->negPrefixList) {
 
             foreach ($this->negPrefixList as $char) {
                 //Search if that prefix is in the document
                 if (strpos($text, $char) !== false && in_array($char, $this->textTokens)) {
-                    //remove the white space after the negative prefix
-                    $charIndex = array_search($char, $this->textTokens);
+//                    get all indexes of current character
+                    $charIndexes = array_keys($this->textTokens, $char);
 
-                    $next = $this->textTokens[$charIndex + 1] ?? "";
-                    $token = "$char $next";
+                    foreach ($charIndexes as $index) {
+                        $nexIndex = $index + 1;
 
-                    //next is positive token then add prefix and token to negative dictionary
-                    if (in_array($next, $this->dictionary['positive'])) {
-                        $this->dictionary['negative'][] = $token;
-                        $this->negativePrefixTokens[] = $token;
+                        $next = $this->textTokens[$nexIndex] ?? "";
+                        $token = trim("$char $next");
+                        //next is positive token then add prefix and token to negative dictionary
+                        if (in_array($next, $this->dictionary['positive'])) {
+                            $removableIndexes[] = $nexIndex;
+                            $this->dictionary['negative'][] = $token;
+                            $this->negativePrefixTokens[] = $token;
+                            $this->textTokens = array_replace($this->textTokens, [$index => $token]);
+                        }
+
+                        //next is positive token then add prefix and token to positive dictionary
+                        if (in_array($next, $this->dictionary['negative'])) {
+                            $removableIndexes[] = $nexIndex;
+                            $this->dictionary['positive'][] = $token;
+                            $this->positivePrefixTokens[] = $token;
+                            $this->textTokens = array_replace($this->textTokens, [$index => $token]);
+
+                        }
+
 
                     }
 
-                    //next is positive token then add prefix and token to positive dictionary
-                    if (in_array($next, $this->dictionary['negative'])) {
-                        $this->dictionary['positive'][] = $token;
-                        $this->positivePrefixTokens[] = $token;
-                    }
-
-                    array_splice($this->textTokens, $charIndex + 1, 1);
-                    $this->textTokens = array_replace($this->textTokens, [$charIndex => $token]);
                 }
             }
+        }
+        foreach ($removableIndexes as $i => $index) {
+            array_splice($this->textTokens, $index - $i, 1);
         }
 
         return $this->textTokens;
@@ -439,7 +450,7 @@ class Sentiment
      */
     private function _cleanString($string)
     {
-        $string = preg_replace('/[^أ-يA-Za-z ]/ui', '', $string);
+        $string = preg_replace('/[^آأ-يءA-Za-z ]/ui', '', $string);
         return $string;
     }
 
