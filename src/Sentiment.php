@@ -2,6 +2,7 @@
 
 namespace Zidan\LaravelSentiment;
 
+use Illuminate\Collections\Arr;
 use Illuminate\Support\Facades\Storage;
 
 class Sentiment
@@ -23,7 +24,7 @@ class Sentiment
      * List of words with negative prefixes, e.g. isn't, arent't
      * @var array
      */
-    protected $negPrefixList        = [];
+    protected $negPrefixList = [];
     protected $negativePrefixTokens = [];
     protected $positivePrefixTokens = [];
 
@@ -88,8 +89,8 @@ class Sentiment
      * Number of analyzed texts
      * @var int
      */
-    protected $docCount             = 0;
-    private   $useDefaultDataFolder = true;
+    protected $docCount = 0;
+    private $useDefaultDataFolder = true;
     /**
      * @var array
      */
@@ -271,18 +272,18 @@ class Sentiment
     {
         $scores = $this->classify($text);
 
-        return array_search(max($scores), $scores);
+        return array_search(max($scores), $scores, true);
     }
 
     /**
      * Load and cache dictionary
      *
-     * @param str $type
+     * @param string $type
      * @return boolean
      */
     protected function setDictionary($type)
     {
-        $typeName = array_search($type, config("laravel-sentiment.types"));
+        $typeName = array_search($type, config('laravel-sentiment.types'), true);
 
         $file = config("laravel-sentiment.data_files.{$type}");
 
@@ -377,7 +378,7 @@ class Sentiment
     /**
      * Break text into tokens
      *
-     * @param str $string String being broken up
+     * @param string $string String being broken up
      * @return array An array of tokens
      */
     private function _getTokens($string)
@@ -396,7 +397,7 @@ class Sentiment
         //Break string into individual words using explode putting them into an array
         $stringArray = explode(' ', $string);
 
-        $stringArray = array_where($stringArray, function ($str) {
+        $stringArray = Arr::where($stringArray, function ($str) {
             if ($str)
                 return $str;
         });
@@ -408,7 +409,7 @@ class Sentiment
     /**
      * Load and cache additional word lists
      *
-     * @param str $type
+     * @param string $type
      * @return array
      */
     protected function getList($type)
@@ -435,7 +436,7 @@ class Sentiment
             $trimmed = trim($word);
 
             //Push results into $wordList array
-            array_push($wordList, $trimmed);
+            $wordList[] = $trimmed;
         }
 
         //Return $wordList
@@ -445,8 +446,8 @@ class Sentiment
     /**
      * Function to clean a string so all characters with accents are turned into ASCII characters. EG: ‡ = a
      * accepts only arabic and english chars
-     * @param str $string
-     * @return str
+     * @param string $string
+     * @return string
      */
     private function _cleanString($string)
     {
@@ -473,7 +474,7 @@ class Sentiment
         foreach ($this->types as $type) {
             $dict = "{$dictionaries}source.{$type}.php";
 
-            require_once( $dict );
+            require_once($dict);
 
             $data = $type;
 
